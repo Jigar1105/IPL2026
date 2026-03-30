@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPL 2026 AI Command Center</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo2.png') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #0f172a; color: white; margin: 0; padding: 0;}
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
+        .top-navbar { background: linear-gradient(to right, #050a1e, #111a47); border-bottom: 2px solid #e11d48; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .nav-btn { cursor: pointer; padding: 10px 18px; border-radius: 6px; transition: all 0.3s ease; font-weight: 600; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; }
+        .nav-btn:hover, .nav-btn.active { background: rgba(59, 130, 246, 0.2); color: #60a5fa; transform: translateY(-2px); }
+        .tool-section { display: none; }
+        .tool-section.active { display: block; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        input, select { background: #1e293b; border: 1px solid #475569; padding: 10px; border-radius: 8px; width: 100%; color: white; outline: none; }
+        input:focus, select:focus { border-color: #3b82f6; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <nav class="top-navbar fixed w-full z-50 flex items-center justify-between px-8 py-3">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="goToHome()">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="IPL Logo" class="h-12 w-auto hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/100x40?text=LOGO';">
+            <h1 class="text-xl font-black tracking-tighter text-white ml-2 hidden sm:block"></h1>
+        </div>
+
+        <div class="flex items-center space-x-1 sm:space-x-2">
+            <div class="nav-btn" onclick="switchTool('tool1', this)">Player Stats</div>
+            <div class="nav-btn" onclick="switchTool('tool2', this)">Score Predictor</div>
+            <div class="nav-btn" onclick="switchTool('tool3', this)">Win Predictor</div>
+            <div class="nav-btn" onclick="switchTool('tool4', this)">H2H Battle</div>
+            <div class="nav-btn" onclick="switchTool('tool5', this)">Matchups</div>
+            <div class="relative group">
+                <div class="nav-btn flex items-center">More
+                    <svg class="w-4 h-4 ml-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+                <div class="hidden group-hover:block absolute right-0 mt-2 w-44 bg-slate-900 rounded-lg border border-slate-700 shadow-lg z-50">
+                    <div class="px-4 py-2 hover:bg-slate-700 cursor-pointer text-sm text-white" onclick="switchTool('tool6', this)">Points Table</div>
+                    <div class="px-4 py-2 hover:bg-slate-700 cursor-pointer text-sm text-white" onclick="switchTool('tool7', this); getTool7();">Records</div>
+                    <div class="px-4 py-2 hover:bg-slate-700 cursor-pointer text-sm text-white" onclick="switchTool('tool8', this)">Graph Analysis</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex-grow pt-28 pb-10 px-6 flex justify-center w-full">
+        <div class="w-full max-w-5xl">
+
+            <div id="homePage" class="tool-section active">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="glass-card p-6 text-center border-b-4 border-blue-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-widest">Total Matches Analyzed</p>
+                        <h2 id="home_total_matches" class="text-5xl font-black mt-2 text-blue-400">---</h2>
+                    </div>
+                    <div class="glass-card p-6 text-center border-b-4 border-green-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-widest">Model Accuracy</p>
+                        <h2 id="home_accuracy" class="text-5xl font-black mt-2 text-green-400">---</h2>
+                    </div>
+                    <div class="glass-card p-6 text-center border-b-4 border-red-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-widest">Engine Status</p>
+                        <h2 class="text-5xl font-black mt-2 text-red-500">LIVE</h2>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="glass-card p-8"><h3 class="text-xl font-bold mb-6 text-gray-300">Avg 1st Innings Score Trend</h3><canvas id="scoreChart"></canvas></div>
+                    <div class="glass-card p-8"><h3 class="text-xl font-bold mb-6 text-gray-300">Win Consistency Index</h3><canvas id="teamChart"></canvas></div>
+                </div>
+            </div>
+
+            <div id="tool1" class="tool-section glass-card p-8 rounded-2xl">
+                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Player Career Statistics</h2>
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div><label class="text-gray-400 text-sm">Select Team</label><select id="t1_team" onchange="updatePlayers('t1_team', 't1_player')"></select></div>
+                    <div><label class="text-gray-400 text-sm">Select Player</label><select id="t1_player"></select></div>
+                </div>
+                <button onclick="getTool1()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition shadow-lg tracking-wider uppercase text-sm">Fetch Stats</button>
+                <div id="t1_res" class="mt-6 text-green-400 font-bold text-xl space-y-2"></div>
+            </div>
+
+            <div id="tool2" class="tool-section glass-card p-8 rounded-2xl">
+                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Neural Score Projector</h2>
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div><label class="text-gray-400 text-sm">Batting Team</label><select id="t2_bat"></select></div>
+                    <div><label class="text-gray-400 text-sm">Bowling Team</label><select id="t2_bowl"></select></div>
+                    <div><label class="text-gray-400 text-sm">Venue</label><select id="t2_venue"></select></div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div><label class="text-gray-400 text-sm">Score</label><input type="number" id="t2_score" value="85"></div>
+                    <div><label class="text-gray-400 text-sm">Wickets Lost</label><input type="number" id="t2_wkts" value="2"></div>
+                    <div><label class="text-gray-400 text-sm">Overs Done</label><input type="number" id="t2_overs" value="10"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div><label class="text-gray-400 text-sm">Striker</label><input type="text" id="t2_striker" value="MS Dhoni"></div>
+                    <div><label class="text-gray-400 text-sm">Death Overs Left</label><input type="number" id="t2_death" value="3"></div>
+                    <div><label class="text-gray-400 text-sm">Out Players (Comma Sep)</label><input type="text" id="t2_out" placeholder="E.g. AM Rahane"></div>
+                </div>
+                <button onclick="getTool2()" class="w-full bg-gradient-to-r from-green-500 to-blue-600 hover:scale-[1.02] py-3 rounded-xl font-bold transition shadow-lg tracking-wider uppercase text-sm">🚀 Run ML Prediction</button>
+                <div id="t2_res" class="mt-8 text-center text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500"></div>
+                <div id="t2_err" class="mt-4 text-center text-red-400 font-bold"></div>
+            </div>
+
+            <div id="tool3" class="tool-section glass-card p-8 rounded-2xl">
+                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Live Win Predictor</h2>
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div><label class="text-gray-400 text-sm">Chasing Team</label><select id="t3_chase"></select></div>
+                    <div><label class="text-gray-400 text-sm">Defending Team</label><select id="t3_def"></select></div>
+                    <div><label class="text-gray-400 text-sm">Target</label><input type="number" id="t3_target" value="185"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div><label class="text-gray-400 text-sm">Current Score</label><input type="number" id="t3_score" value="75"></div>
+                    <div><label class="text-gray-400 text-sm">Wickets</label><input type="number" id="t3_wkts" value="2"></div>
+                    <div><label class="text-gray-400 text-sm">Overs Done</label><input type="number" id="t3_overs" value="10"></div>
+                </div>
+                <button onclick="getTool3()" class="w-full bg-gradient-to-r from-red-500 to-yellow-500 hover:scale-[1.02] py-3 rounded-xl font-bold transition shadow-lg uppercase text-sm">🏆 Calculate Probability</button>
+                <div id="t3_bar" class="mt-8 hidden">
+                    <div class="w-full bg-red-500 rounded-lg flex h-12 font-bold text-xl overflow-hidden shadow-lg border border-gray-600">
+                        <div id="t3_chase_fill" class="bg-green-500 flex justify-center items-center transition-all duration-700"></div>
+                        <div id="t3_def_fill" class="flex justify-center items-center flex-1 transition-all duration-700"></div>
+                    </div>
+                </div>
+                <div id="t3_err" class="mt-4 text-center text-red-400 font-bold"></div>
+            </div>
+
+            <div id="tool4" class="tool-section glass-card p-8 rounded-2xl">
+                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Deep Player Matchups</h2>
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-gray-400 text-sm">Player's Team</label><select id="t4_team1" onchange="updatePlayers('t4_team1', 't4_player')"></select></div>
+                        <div><label class="text-gray-400 text-sm">Select Player</label><select id="t4_player"></select></div>
+                    </div>
+                    <div><label class="text-gray-400 text-sm">Opponent Team</label><select id="t4_team2"></select></div>
+                </div>
+                <button onclick="getTool4()" class="w-full bg-orange-600 hover:bg-orange-500 py-3 rounded-xl font-bold transition shadow-lg tracking-wider uppercase text-sm">⚔️ Analyze Matchup</button>
+                <div id="t4_err" class="mt-4 text-red-400 font-bold text-center"></div>
+                <div id="t4_res" class="mt-6 space-y-4"></div>
+            </div>
+
+            <div id="tool5" class="tool-section glass-card p-8 rounded-2xl">
+                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Team vs Team Clash</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                        <label class="text-gray-400 text-sm font-semibold">Team 1</label>
+                        <select id="t5_team1" class="mt-2"></select>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                        <label class="text-gray-400 text-sm font-semibold">Team 2</label>
+                        <select id="t5_team2" class="mt-2"></select>
+                    </div>
+                </div>
+
+                <!-- <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                        <p class="text-sm text-gray-400 uppercase tracking-wider">Win Rate</p>
+                        <h3 id="t5_win_rate" class="text-4xl font-extrabold text-cyan-400">--%</h3>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                        <p class="text-sm text-gray-400 uppercase tracking-wider">Head-to-Head</p>
+                        <h3 id="t5_h2h" class="text-4xl font-extrabold text-amber-400">--</h3>
+                    </div>
+                </div> -->
+
+                <button onclick="getTool5()" class="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 py-3 rounded-xl font-bold transition shadow-lg tracking-wider uppercase text-sm">🏢 Compare History</button>
+
+                <div id="t5_res" class="mt-8 bg-slate-900 border border-slate-700 rounded-xl p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="p-4 rounded-lg bg-slate-800/70">
+                            <p class="text-xs text-gray-400 uppercase">Matches</p>
+                            <p id="t5_matches" class="text-3xl font-bold text-white">--</p>
+                        </div>
+                        <div class="p-4 rounded-lg bg-slate-800/70">
+                            <p class="text-xs text-gray-400 uppercase">Wins</p>
+                            <p id="t5_wins" class="text-3xl font-bold text-green-400">--</p>
+                        </div>
+                        <div class="p-4 rounded-lg bg-slate-800/70">
+                            <p class="text-xs text-gray-400 uppercase">Losses</p>
+                            <p id="t5_losses" class="text-3xl font-bold text-red-400">--</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tool6" class="tool-section glass-card p-8 rounded-2xl">
+                <h2 class="text-3xl font-bold mb-6 border-b border-gray-700 pb-2">Points Table</h2>
+                <div class="overflow-x-auto rounded-xl border border-gray-700 bg-slate-900 p-4">
+                    <table class="w-full text-sm text-left text-gray-200">
+                        <thead class="text-xs uppercase tracking-wider text-gray-400"><tr><th class="px-4 py-2">Pos</th><th class="px-4 py-2">Team</th><th class="px-4 py-2">P</th><th class="px-4 py-2">W</th><th class="px-4 py-2">L</th><th class="px-4 py-2">Pts</th></tr></thead>
+                        <tbody id="points_table_body"><tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Load data from backend or implement later</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tool7" class="tool-section bg-gray-50 p-8 rounded-2xl shadow-inner border border-gray-200">
+                <div class="mb-10">
+                    <h2 class="text-2xl italic font-black text-gray-800 mb-6 tracking-wide">All Time Batting Leaders</h2>
+                    <div id="batting_records_container" class="flex overflow-x-auto gap-6 pb-6 pt-2 custom-scrollbar">
+                        <div class="text-gray-500 font-bold w-full text-center py-10 animate-pulse">Loading Batting Records...</div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-2xl italic font-black text-gray-800 mb-6 tracking-wide">All Time Bowling Leaders</h2>
+                    <div id="bowling_records_container" class="flex overflow-x-auto gap-6 pb-6 pt-2 custom-scrollbar">
+                        <div class="text-gray-500 font-bold w-full text-center py-10 animate-pulse">Loading Bowling Records...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tool8" class="tool-section bg-[#0b1120] p-8 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-gray-800">
+                
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 border-b border-gray-800 pb-6 gap-4">
+                    <div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-blue-600/20 text-blue-400 text-xs font-black px-3 py-1 rounded-full border border-blue-500/30 uppercase tracking-widest">Pro Feature</span>
+                        </div>
+                        <h2 class="text-4xl font-black text-white tracking-wide">Seaborn <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400">Deep Analytics</span></h2>
+                        <p class="text-gray-400 text-sm mt-2 font-medium">Industry-standard static visual reports generated directly from Python backend.</p>
+                    </div>
+                    <button onclick="getTool8()" class="group relative px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl font-bold text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] transition-all duration-300 overflow-hidden">
+                        <span class="relative z-10 flex items-center gap-2">
+                            <svg class="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            Generate Reports
+                        </span>
+                    </button>
+                </div>
+
+                <div id="graphLoading" class="hidden flex-col items-center justify-center py-20">
+                    <div class="relative w-20 h-20">
+                        <div class="absolute inset-0 rounded-full border-t-4 border-blue-500 animate-spin"></div>
+                        <div class="absolute inset-2 rounded-full border-r-4 border-cyan-400 animate-[spin_1.5s_linear_infinite_reverse]"></div>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mt-6 tracking-widest animate-pulse">Running Python Engine...</h3>
+                    <p class="text-gray-500 text-sm mt-2">Compiling HD Seaborn Plots (takes 2-4 seconds)</p>
+                </div>
+                
+                <div id="graphsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 transition-opacity duration-500 opacity-0 hidden">
+                    
+                    <script>
+                        // Ye loop automatically 15 image containers bana dega alag-alag sizes ke sath
+                        for(let i=1; i<=15; i++) {
+                            // G3, G7, G11, G13, G14 ko bada (wide) dikhane ke liye col-span-2 denge
+                            let spanClass = [3, 7, 11, 13, 14].includes(i) ? 'md:col-span-2 xl:col-span-2' : 'col-span-1';
+                            document.write(`
+                                <div class="${spanClass} group relative bg-[#12182b] rounded-2xl border border-gray-700/50 shadow-lg overflow-hidden hover:border-blue-500/50 hover:shadow-[0_8px_30px_rgba(37,99,235,0.15)] transition-all duration-300 flex justify-center items-center min-h-[300px]">
+                                    <div class="absolute inset-0 bg-gradient-to-r from-[#12182b] via-[#1a2238] to-[#12182b] animate-[pulse_2s_ease-in-out_infinite] -z-10"></div>
+                                    
+                                    <img id="img_g${i}" class="w-full h-auto max-h-[450px] object-contain transform transition-transform duration-500 group-hover:scale-[1.03] opacity-0" alt="Analytics Graph ${i}">
+                                </div>
+                            `);
+                        }
+                    </script>
+
+                </div>
+            </div>
+
+    <script>
+        let squadsData = {};
+
+        // On Load: Fetch Data for Dropdowns
+        window.onload = async () => {
+            try {
+                const resSquads = await fetch('/api/get_squads');
+                const dataSquads = await resSquads.json();
+                squadsData = dataSquads.squads;
+                const teams = Object.keys(squadsData);
+                
+                ['t1_team', 't2_bat', 't2_bowl', 't3_chase', 't3_def', 't4_team1', 't4_team2', 't5_team1', 't5_team2'].forEach(id => {
+                    let sel = document.getElementById(id);
+                    if(sel) teams.forEach(t => sel.add(new Option(t, t)));
+                });
+                
+                if(dataSquads.venues) {
+                    dataSquads.venues.forEach(v => document.getElementById('t2_venue').add(new Option(v, v)));
+                }
+                
+                updatePlayers('t1_team', 't1_player');
+                updatePlayers('t4_team1', 't4_player');
+
+                const resHome = await fetch('/api/get_home_stats');
+                const dHome = await resHome.json();
+                document.getElementById('home_total_matches').innerText = dHome.total_matches;
+                document.getElementById('home_accuracy').innerText = dHome.model_accuracy;
+                initHomeCharts(dHome.years, dHome.avg_scores);
+            } catch(e) {
+                console.error("Initialization Error:", e);
+            }
+        };
+
+        function goToHome() {
+            document.querySelectorAll('.tool-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('homePage').classList.add('active');
+        }
+
+        function switchTool(toolId, btn) {
+            document.querySelectorAll('.tool-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(toolId).classList.add('active');
+            if (btn && btn.classList.contains('nav-btn')) {
+                btn.classList.add('active');
+            } else {
+                const moreNavBtn = document.querySelector('.relative.group > .nav-btn');
+                if (moreNavBtn) moreNavBtn.classList.add('active');
+            }
+        }
+
+        function updatePlayers(teamId, playerId) {
+            let team = document.getElementById(teamId).value;
+            let p_sel = document.getElementById(playerId);
+            p_sel.innerHTML = '';
+            if(squadsData[team]) {
+                squadsData[team].forEach(p => p_sel.add(new Option(p, p)));
+            }
+        }
+
+        // TOOL 1
+        async function getTool1() {
+            document.getElementById('t1_res').innerHTML = '<div class="text-gray-400">Loading...</div>';
+            const res = await fetch('/api/tool1_player_stats', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({player: document.getElementById('t1_player').value})
+            });
+            const data = await res.json();
+            
+            if (data.bat_stats.length === 0 && data.bowl_stats.length === 0) {
+                document.getElementById('t1_res').innerHTML = '<div class="text-gray-400 p-4 bg-gray-800 rounded-lg">No IPL History found.</div>';
+                return;
+            }
+
+            let html = '';
+            if(data.bat_stats.length > 0) {
+                html += `<h3 class="text-xl font-bold text-blue-400 mt-2 mb-3">🏏 Batting</h3>
+                <div class="overflow-x-auto rounded-xl border border-gray-600 mb-6">
+                    <table class="w-full text-sm text-left text-gray-300">
+                        <thead class="text-xs text-white uppercase bg-gray-800 border-b border-gray-600"><tr><th class="px-5 py-3">Year</th><th class="px-5 py-3">MAT</th><th class="px-5 py-3">RUNS</th><th class="px-5 py-3">HS</th><th class="px-5 py-3">AVG</th><th class="px-5 py-3">SR</th></tr></thead>
+                        <tbody>`;
+                data.bat_stats.forEach(row => {
+                    let cls = row.Year === 'Career' ? 'bg-blue-900/40 font-bold text-white' : 'bg-gray-800/40';
+                    html += `<tr class="${cls} border-b border-gray-700/50"><td class="px-5 py-2">${row.Year}</td><td class="px-5 py-2">${row.MAT}</td><td class="px-5 py-2">${row.RUNS}</td><td class="px-5 py-2">${row.HS}</td><td class="px-5 py-2">${row.AVG}</td><td class="px-5 py-2">${row.SR}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            if(data.bowl_stats.length > 0) {
+                html += `<h3 class="text-xl font-bold text-green-400 mb-3">☄️ Bowling</h3>
+                <div class="overflow-x-auto rounded-xl border border-gray-600">
+                    <table class="w-full text-sm text-left text-gray-300">
+                        <thead class="text-xs text-white uppercase bg-gray-800 border-b border-gray-600"><tr><th class="px-5 py-3">Year</th><th class="px-5 py-3">MAT</th><th class="px-5 py-3">WKT</th><th class="px-5 py-3">Overs</th><th class="px-5 py-3">ECON</th></tr></thead>
+                        <tbody>`;
+                data.bowl_stats.forEach(row => {
+                    let cls = row.Year === 'Career' ? 'bg-green-900/40 font-bold text-white' : 'bg-gray-800/40';
+                    html += `<tr class="${cls} border-b border-gray-700/50"><td class="px-5 py-2">${row.Year}</td><td class="px-5 py-2">${row.MAT}</td><td class="px-5 py-2">${row.WKT}</td><td class="px-5 py-2">${row.Overs}</td><td class="px-5 py-2">${row.ECON}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            document.getElementById('t1_res').innerHTML = html;
+        }
+
+        // TOOL 2
+        async function getTool2() {
+            document.getElementById('t2_err').innerText = ""; document.getElementById('t2_res').innerText = "Loading...";
+            let out_arr = document.getElementById('t2_out').value ? document.getElementById('t2_out').value.split(',').map(s=>s.trim()) : [];
+            const payload = {
+                bat_team: document.getElementById('t2_bat').value, bowl_team: document.getElementById('t2_bowl').value,
+                venue: document.getElementById('t2_venue').value, score: document.getElementById('t2_score').value,
+                wkts: document.getElementById('t2_wkts').value, overs: document.getElementById('t2_overs').value,
+                striker: document.getElementById('t2_striker').value, death_overs: document.getElementById('t2_death').value,
+                out_players: out_arr, playing_11: squadsData[document.getElementById('t2_bat').value].slice(0,11)
+            };
+            const res = await fetch('/api/tool2_predict_score', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            const data = await res.json();
+            if(data.error) { document.getElementById('t2_err').innerText = "🚨 " + data.error; document.getElementById('t2_res').innerText = ""; }
+            else document.getElementById('t2_res').innerText = data.score;
+        }
+
+        // TOOL 3
+        async function getTool3() {
+            document.getElementById('t3_bar').classList.add('hidden'); document.getElementById('t3_err').innerText = "";
+            const payload = {
+                chase_team: document.getElementById('t3_chase').value, def_team: document.getElementById('t3_def').value,
+                venue: "Wankhede Stadium", target: document.getElementById('t3_target').value,
+                score: document.getElementById('t3_score').value, wkts: document.getElementById('t3_wkts').value, overs: document.getElementById('t3_overs').value
+            };
+            const res = await fetch('/api/tool3_predict_win', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            const data = await res.json();
+            if(data.error) document.getElementById('t3_err').innerText = data.error;
+            else {
+                document.getElementById('t3_bar').classList.remove('hidden');
+                document.getElementById('t3_chase_fill').style.width = data.chase_percent + "%";
+                document.getElementById('t3_chase_fill').innerText = document.getElementById('t3_chase').value + " " + data.chase_percent + "%";
+                document.getElementById('t3_def_fill').innerText = document.getElementById('t3_def').value + " " + data.def_percent + "%";
+            }
+        }
+
+        // TOOL 4
+        async function getTool4() {
+            document.getElementById('t4_err').innerText = "";
+            document.getElementById('t4_res').innerHTML = '<div class="text-gray-400 p-4 text-center">Loading Deep Matchups...</div>';
+            
+            const team1 = document.getElementById('t4_team1').value;
+            const team2 = document.getElementById('t4_team2').value;
+            const player = document.getElementById('t4_player').value;
+
+            if(team1 === team2) {
+                document.getElementById('t4_err').innerText = "Select different opposing team!"; 
+                document.getElementById('t4_res').innerHTML = "";
+                return;
+            }
+
+            const payload = { player: player, opp_team: team2 };
+            try {
+                const res = await fetch('/api/tool4_h2h_battle', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const data = await res.json();
+                
+                if (data.error) {
+                    document.getElementById('t4_err').innerText = data.error;
+                    document.getElementById('t4_res').innerHTML = "";
+                    return;
+                }
+
+                let hasOverallBat = Object.keys(data.bat_stats || {}).length > 0;
+                let hasOverallBowl = Object.keys(data.bowl_stats || {}).length > 0;
+                let hasIndividualBat = data.batter_vs_bowlers && data.batter_vs_bowlers.length > 0;
+                let hasIndividualBowl = data.bowler_vs_batters && data.bowler_vs_batters.length > 0;
+
+                if (!hasOverallBat && !hasOverallBowl && !hasIndividualBat && !hasIndividualBowl) {
+                    document.getElementById('t4_res').innerHTML = `
+                        <div class="bg-gray-800 p-8 rounded-2xl border border-gray-600 text-center shadow-lg mt-4">
+                            <h3 class="text-4xl font-black text-yellow-400 mb-2">🌟 DEBUTANT</h3>
+                            <p class="text-gray-400 mt-2 text-lg">${data.player} has no historical IPL records against the current ${data.opp_team} squad.</p>
+                        </div>`;
+                    return;
+                }
+
+                let html = '';
+
+                if(hasOverallBat || hasIndividualBat) {
+                    html += `<div class="bg-gray-800 p-6 rounded-2xl border border-gray-600 mb-6 shadow-lg">`;
+                    html += `<h3 class="text-2xl font-bold text-green-400 mb-4">🏏 Batting vs ${data.opp_team}</h3>`;
+                    
+                    if(hasOverallBat) {
+                        html += `<div class="mb-5 bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                            <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Overall Franchise Record</p>
+                            <p class="text-lg">Runs: <b class="text-white">${data.bat_stats.runs}</b> &nbsp;|&nbsp; Avg: <b class="text-white">${data.bat_stats.avg}</b> &nbsp;|&nbsp; SR: <b class="text-white">${data.bat_stats.sr}</b> &nbsp;|&nbsp; HS: <b class="text-white">${data.bat_stats.hs}</b></p>
+                        </div>`;
+                    }
+
+                    if(hasIndividualBat) {
+                        html += `<p class="text-xs text-gray-400 uppercase tracking-widest mb-2">Performance vs Current Squad Bowlers</p>
+                        <div class="overflow-x-auto rounded-xl border border-gray-700">
+                            <table class="w-full text-sm text-left text-gray-300">
+                                <thead class="text-xs text-white uppercase bg-gray-900 border-b border-gray-700">
+                                    <tr><th class="px-5 py-3">Bowler</th><th class="px-5 py-3">Runs</th><th class="px-5 py-3">Balls</th><th class="px-5 py-3">Dismissals</th><th class="px-5 py-3">Strike Rate</th></tr>
+                                </thead>
+                                <tbody>`;
+                        data.batter_vs_bowlers.forEach(row => {
+                            html += `<tr class="bg-gray-800/40 hover:bg-gray-700/50 border-b border-gray-700/50">
+                                <td class="px-5 py-3 font-bold text-white">${row.Opponent}</td><td class="px-5 py-3">${row.Runs}</td><td class="px-5 py-3">${row.Balls}</td>
+                                <td class="px-5 py-3 text-red-400 font-bold">${row.Dismissals}</td><td class="px-5 py-3">${row.SR}</td>
+                            </tr>`;
+                        });
+                        html += `</tbody></table></div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                if(hasOverallBowl || hasIndividualBowl) {
+                    html += `<div class="bg-gray-800 p-6 rounded-2xl border border-gray-600 shadow-lg">`;
+                    html += `<h3 class="text-2xl font-bold text-orange-400 mb-4">☄️ Bowling vs ${data.opp_team}</h3>`;
+                    
+                    if(hasOverallBowl) {
+                         html += `<div class="mb-5 bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                            <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Overall Franchise Record</p>
+                            <p class="text-lg">Wickets: <b class="text-white">${data.bowl_stats.wkts}</b> &nbsp;|&nbsp; Econ: <b class="text-white">${data.bowl_stats.econ}</b> &nbsp;|&nbsp; Overs: <b class="text-white">${data.bowl_stats.overs}</b></p>
+                        </div>`;
+                    }
+
+                    if(hasIndividualBowl) {
+                        html += `<p class="text-xs text-gray-400 uppercase tracking-widest mb-2">Performance vs Current Squad Batters</p>
+                        <div class="overflow-x-auto rounded-xl border border-gray-700">
+                            <table class="w-full text-sm text-left text-gray-300">
+                                <thead class="text-xs text-white uppercase bg-gray-900 border-b border-gray-700">
+                                    <tr><th class="px-5 py-3">Batter</th><th class="px-5 py-3">Runs</th><th class="px-5 py-3">Balls</th><th class="px-5 py-3">Wickets Taken</th><th class="px-5 py-3">Batter SR</th></tr>
+                                </thead>
+                                <tbody>`;
+                        data.bowler_vs_batters.forEach(row => {
+                            html += `<tr class="bg-gray-800/40 hover:bg-gray-700/50 border-b border-gray-700/50">
+                                <td class="px-5 py-3 font-bold text-white">${row.Opponent}</td><td class="px-5 py-3">${row.Runs}</td><td class="px-5 py-3">${row.Balls}</td>
+                                <td class="px-5 py-3 text-green-400 font-bold">${row.Wickets}</td><td class="px-5 py-3">${row.SR}</td>
+                            </tr>`;
+                        });
+                        html += `</tbody></table></div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                document.getElementById('t4_res').innerHTML = html;
+            } catch(e) {
+                document.getElementById('t4_err').innerText = "Failed to connect to the server.";
+                document.getElementById('t4_res').innerHTML = "";
+            }
+        }
+
+        // TOOL 5 (THE FINAL PIXEL-PERFECT FIX)
+        async function getTool5() {
+            const container = document.getElementById('t5_res');
+            container.innerHTML = `<div class="flex justify-center w-full mt-10"><div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div></div>`;
+            
+            const team1 = document.getElementById('t5_team1').value;
+            const team2 = document.getElementById('t5_team2').value;
+            const payload = { team_a: team1, team_b: team2 };
+            
+            try {
+                const res = await fetch('/api/tool_matchups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const data = await res.json();
+                
+                if(data.error) { container.innerHTML = `<div class="text-red-500 text-center font-bold p-4">${data.error}</div>`; return; }
+
+                // Wrapper to center everything and make it properly wide
+                let html = `<div class="flex flex-col gap-8 w-full max-w-5xl mx-auto mt-6 text-white">`;
+
+                // ==========================================
+                // 1. STATS TABLE (Centered and Wide)
+                // ==========================================
+                html += `
+                <div class="w-full bg-[#12141a] rounded-2xl border border-gray-800 shadow-2xl flex flex-col overflow-hidden">
+                    <div class="flex justify-between items-center bg-[#161a22] p-6 px-10 border-b border-gray-800">
+                        <span class="text-3xl font-black text-blue-500 w-1/3 text-left">${team1}</span>
+                        <span class="text-sm text-gray-500 font-bold w-1/3 text-center uppercase tracking-widest">VS</span>
+                        <span class="text-3xl font-black text-blue-500 w-1/3 text-right">${team2}</span>
+                    </div>
+                    <div class="flex flex-col">
+                        ${rowHtml(data.total, "Matches Played", data.total)}
+                        ${rowHtml(data.wins_a, "Won", data.wins_b, "text-[#10b981]", "text-[#ef4444]")}
+                        ${rowHtml(data.wins_b, "Lost", data.wins_a, "text-[#ef4444]", "text-[#10b981]")}
+                        ${rowHtml(data.ties, "No Result", data.ties)}
+                        ${rowHtml(data.hs_a, "Highest Score", data.hs_b)}
+                        ${rowHtml(data.ls_a, "Lowest Score", data.ls_b, "text-white", "text-white", true)}
+                    </div>
+                </div>
+                `;
+
+                // ==========================================
+                // 2. RECENT FORM (Directly below Stats)
+                // ==========================================
+                html += `
+                <div class="w-full bg-[#12141a] rounded-2xl border border-gray-800 shadow-2xl p-6 flex flex-col">
+                    <h3 class="text-center text-gray-400 font-bold tracking-widest uppercase text-sm mb-6 border-b border-gray-800 pb-4">Recent Form (Last 5 Matches)</h3>
+                    
+                    <div class="flex flex-row w-full divide-x divide-gray-800">
+                        <div class="w-1/2 flex flex-col items-center pb-2">
+                            <span class="text-2xl font-black text-white mb-6">${team1}</span>
+                            <div class="flex flex-wrap justify-center gap-4 sm:gap-6">
+                                ${getFormCircles(data.last_5_a)}
+                            </div>
+                        </div>
+                        
+                        <div class="w-1/2 flex flex-col items-center pb-2">
+                            <span class="text-2xl font-black text-white mb-6">${team2}</span>
+                            <div class="flex flex-wrap justify-center gap-4 sm:gap-6">
+                                ${getFormCircles(data.last_5_b)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+
+                // ==========================================
+                // 3. ALL SEASONS (Horizontal with 2 boxes per row)
+                // ==========================================
+                html += `
+                <div class="w-full mt-4">
+                    <h3 class="text-center text-2xl font-black text-white mb-8 uppercase tracking-widest">${team1} vs ${team2} in all seasons</h3>
+                    
+                    <div class="grid grid-cols-2 gap-5">
+                `;
+                
+                let years = Object.keys(data.seasons || {}).sort((a, b) => b - a);
+                if(years.length === 0) {
+                    html += `<div class="col-span-full text-center text-gray-500 bg-[#12141a] p-6 rounded-xl border border-gray-800">No match history found.</div>`;
+                } else {
+                    years.forEach(yr => {
+                        html += `
+                        <div class="bg-[#12141a] border border-gray-800 rounded-[2rem] p-6 flex flex-col items-center shadow-lg hover:shadow-2xl hover:border-gray-600 transition-all">
+                            <h4 class="text-2xl font-black text-white mb-4 border-b border-gray-800 w-full text-center pb-3">${yr}</h4>
+                            <ul class="space-y-5 flex flex-col items-start w-full">
+                        `;
+                        data.seasons[yr].forEach(match => {
+                            let dotColor = match.includes(team1 + " won") ? 'bg-yellow-400' : 'bg-blue-400';
+                            html += `
+                            <li class="flex flex-row items-center gap-2">
+                                <div class="w-2.5 h-2.5 rounded-full ${dotColor} shadow-[0_0_8px_currentColor]"></div> 
+                                <span class="text-[12px] font-bold text-gray-300 leading-tight tracking-wide">${match}</span>
+                            </li>`;
+                        });
+                        html += `</ul></div>`;
+                    });
+                }
+                html += `</div></div></div>`;
+
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = `<div class="text-red-500 text-center p-4">Error loading data. Check console.</div>`;
+                console.error(e);
+            }
+
+            // --- HTML Helpers specifically for this layout ---
+            function rowHtml(left, label, right, lColor="text-white", rColor="text-white", isLast=false) {
+                return `
+                <div class="flex justify-between items-center py-5 px-10 ${isLast ? '' : 'border-b border-gray-800/50 hover:bg-gray-800/30'} transition-colors">
+                    <span class="text-4xl font-black ${lColor} w-24 text-left">${left}</span>
+                    <span class="text-[11px] text-gray-400 font-black uppercase tracking-[0.2em] flex-1 text-center">${label}</span>
+                    <span class="text-4xl font-black ${rColor} w-24 text-right">${right}</span>
+                </div>`;
+            }
+
+            function getFormCircles(arr) {
+                return arr.map(m => {
+                    let bg = m.res === 'W' ? 'bg-[#10b981] shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-[#ef4444] shadow-[0_0_10px_rgba(239,68,68,0.4)]';
+                    return `
+                    <div class="flex flex-col items-center min-w-[40px]">
+                        <div class="${bg} w-[42px] h-[42px] rounded-full flex items-center justify-center text-white font-black text-[15px]">${m.res}</div>
+                        <span class="text-[10px] text-gray-500 font-bold uppercase mt-3 tracking-widest">${m.opp.substring(0,3)}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // TOOL 7: RECORDS (Pixel Perfect UI)
+        async function getTool7() {
+            const batContainer = document.getElementById('batting_records_container');
+            const bowlContainer = document.getElementById('bowling_records_container');
+            
+            try {
+                const res = await fetch('/api/get_records');
+                const data = await res.json();
+                window.fullRecordsData = data; // Ye line naye modal ke liye data save karegi
+
+                if(data.error) {
+                    batContainer.innerHTML = `<div class="text-red-500 font-bold p-4">Error: ${data.error}</div>`;
+                    return;
+                }
+
+                // Helper to generate the exact Card UI from screenshot
+                const createCard = (title, name, statValue, statLabel, theme) => {
+                    // Theme config based on screenshots
+                    const themes = {
+                        'orange': { bg: 'bg-gradient-to-t from-orange-400 to-orange-500', badgeBg: 'bg-orange-500' },
+                        'blue': { bg: 'bg-[#102754]', badgeBg: 'bg-[#0f172a]' }, // Standard RCB/PBKS blue look
+                        'purple': { bg: 'bg-gradient-to-t from-purple-500 to-purple-600', badgeBg: 'bg-purple-700' }
+                    };
+                    const t = themes[theme] || themes['blue'];
+
+                    // Note: In real app, you would have a database of player PNG URLs. Using placeholder initials here.
+                    // Naam ke space ko underscore (_) me badlega
+                    let safeName = name ? name.split(' ').join('_') : 'default'; 
+
+                    // Aapke static folder se .jpg photo uthayega
+                    let playerImg = `/static/players/${safeName}.png`;
+
+                return `
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-100 w-[240px] flex-shrink-0 flex flex-col relative group overflow-visible mt-4">
+                        
+                        <div class="relative h-[220px] ${t.bg} rounded-t-xl flex justify-center items-end">
+                            
+
+                            <div class="absolute bottom-0 w-[180px] h-[140px] bg-white/10 rounded-t-full z-0"></div>
+                            
+                            <img src="${playerImg}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${name ? name.split(' ').join('+') : 'Player'}&background=1e293b&color=fff&size=200';" class="h-[195px] object-contain object-bottom z-10 drop-shadow-2xl transition-transform duration-300 group-hover:scale-105" alt="${name}">
+                            
+                            <div class="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-[110%] text-center z-30">
+                                <div class="${t.badgeBg} text-white text-[12px] px-6 py-1.5 font-bold uppercase tracking-widest shadow-lg inline-block whitespace-nowrap" style="clip-path: polygon(8% 0, 100% 0, 92% 100%, 0% 100%);">
+                                    ${title}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-8 pb-4 text-center bg-white flex flex-col flex-grow rounded-b-xl">
+                            <h4 class="text-[#1e3a8a] font-black text-[18px] truncate px-3">${name || 'N/A'}</h4>
+                            <div class="mt-2 mb-4">
+                                <div class="text-[36px] font-black text-gray-800 leading-none">${statValue || 0}</div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-2">${statLabel}</div>
+                            </div>
+                            <div class="border-t border-gray-100 mt-auto pt-4 px-4">
+                                <button onclick="openRecordModal('${title}')" class="text-[13px] text-gray-500 font-bold uppercase hover:text-[#1e3a8a] transition-colors w-full py-2">View Full List</button>
+                            </div>
+                        </div>
+                    </div>`;
+                };
+
+                // BATTING CARDS
+               // BATTING CARDS
+                batContainer.innerHTML = [
+                    createCard('Orange cap', data.top_batters?.[0]?.batter, data.top_batters?.[0]?.runs, 'RUNS', 'orange'),
+                    createCard('Most Fours', data.most_fours?.[0]?.batter, data.most_fours?.[0]?.fours, 'FOURS', 'blue'),
+                    createCard('Most Sixes', data.most_sixes?.[0]?.batter, data.most_sixes?.[0]?.sixes, 'SIXES', 'blue'),
+                    createCard('Highest Score', data.highest_score?.[0]?.batter, data.highest_score?.[0]?.runs_batter, 'SCORE', 'blue'),
+                    createCard('Best Strike Rate', data.best_strike_rate?.[0]?.batter, data.best_strike_rate?.[0]?.strike_rate, 'STRIKE RATE', 'blue'),
+                    createCard('Fastest Fifties', data.fastest_fifty?.[0]?.batter, data.fastest_fifty?.[0]?.balls, 'BALLS', 'blue'),
+                    createCard('Fastest Centuries', data.fastest_century?.[0]?.batter, data.fastest_century?.[0]?.balls, 'BALLS', 'blue')
+                ].join('');
+
+                // BOWLING CARDS
+                bowlContainer.innerHTML = [
+                    createCard('Purple cap', data.top_bowlers?.[0]?.bowler, data.top_bowlers?.[0]?.wickets, 'WICKETS', 'purple'),
+                    createCard('Best Bowling Figures', data.best_bowling_figures?.[0]?.bowler, data.best_bowling_figures?.[0]?.figs, 'FIGS', 'blue'),
+                    createCard('Best Bowling Average', data.best_bowling_average?.[0]?.bowler, data.best_bowling_average?.[0]?.average, 'AVERAGE', 'blue'),
+                    createCard('Best Economy', data.best_economy?.[0]?.bowler, data.best_economy?.[0]?.economy, 'ECONOMY', 'blue'),
+                    createCard('Most Dots', data.most_dots?.[0]?.bowler, data.most_dots?.[0]?.dots, 'DOTS', 'blue')
+                ].join('');
+
+            } catch(e) {
+                console.error(e);
+                batContainer.innerHTML = `<div class="text-red-500 p-4">Failed to load data.</div>`;
+            }
+        }
+
+        // ==========================================
+        // TOOL 8: SEABORN GRAPH ANALYTICS FETCHING
+        // ==========================================
+        async function getTool8() {
+            const loadingUI = document.getElementById('graphLoading');
+            const gridUI = document.getElementById('graphsGrid');
+            
+            // Show Loader, Hide Grid
+            gridUI.classList.add('hidden');
+            gridUI.classList.remove('opacity-100');
+            loadingUI.classList.remove('hidden');
+            loadingUI.classList.add('flex');
+
+            try {
+                // Fetch data from Python backend
+                const res = await fetch('/api/get_graphs');
+                const data = await res.json();
+                
+                if(data.error) {
+                    alert("Seaborn Engine Error: " + data.error);
+                    loadingUI.classList.add('hidden');
+                    loadingUI.classList.remove('flex');
+                    return;
+                }
+
+                // Bind base64 images to HTML img tags
+                for(let i=1; i<=15; i++) {
+                    let imgEl = document.getElementById(`img_g${i}`);
+                    if(imgEl && data[`g${i}`]) {
+                        // Image load hone ke baad fade-in animation denge
+                        imgEl.onload = function() {
+                            this.classList.remove('opacity-0');
+                            this.classList.add('opacity-100');
+                        };
+                        imgEl.src = data[`g${i}`];
+                    }
+                }
+
+                // Hide Loader, Show Grid smoothly
+                loadingUI.classList.add('hidden');
+                loadingUI.classList.remove('flex');
+                
+                gridUI.classList.remove('hidden');
+                // Chota delay denge taaki grid render ho jaye phir opacity badhe
+                setTimeout(() => {
+                    gridUI.classList.add('opacity-100');
+                }, 50);
+
+            } catch (error) {
+                console.error("Error drawing Seaborn graphs:", error);
+                alert("Failed to connect to the Analytics Engine.");
+                loadingUI.classList.add('hidden');
+                loadingUI.classList.remove('flex');
+            }
+        }
+
+        // HOME GRAPHS
+        function initHomeCharts(years, scores) {
+            new Chart(document.getElementById('scoreChart'), { type: 'line', data: { labels: years, datasets: [{ label: 'Avg Score', data: scores, borderColor: '#3b82f6', tension: 0.3, fill: true, backgroundColor: 'rgba(59, 130, 246, 0.1)' }] }, options: { responsive: true, plugins: { legend: { display: false } } } });
+            new Chart(document.getElementById('teamChart'), { type: 'bar', data: { labels: ['CSK', 'MI', 'RCB', 'KKR', 'RR'], datasets: [{ data: [80, 78, 70, 75, 72], backgroundColor: ['#facc15', '#3b82f6', '#ef4444', '#a855f7', '#ec4899'] }] }, options: { responsive: true, plugins: { legend: { display: false } } } });
+        }
+
+        // ==========================================
+        // POPUP MODAL LOGIC FOR "VIEW FULL LIST"
+        // ==========================================
+        // 1. Create Modal HTML UI dynamically
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="recordModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex justify-center items-center p-4 opacity-0 transition-opacity duration-300">
+                <div class="bg-[#0f172a] w-full max-w-md rounded-2xl border border-gray-600 shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="recordModalContent">
+                    <div class="flex justify-between items-center bg-[#1e293b] p-5 border-b border-gray-700">
+                        <h3 id="modalTitle" class="text-xl font-black text-white uppercase tracking-wider">Title</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 font-bold text-3xl leading-none transition-colors">&times;</button>
+                    </div>
+                    <div class="p-0 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-[#0b1120] text-xs uppercase text-gray-500 sticky top-0 shadow-md">
+                                <tr><th class="px-6 py-4">Rank</th><th class="px-6 py-4">Player</th><th class="px-6 py-4 text-right">Stat</th></tr>
+                            </thead>
+                            <tbody id="modalBody" class="divide-y divide-gray-800/50">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `);
+
+        // 2. Open Modal Function
+        function openRecordModal(title) {
+            if(!window.fullRecordsData) return;
+            let d = window.fullRecordsData;
+            let list = [];
+            let nameKey = '', statKey = '';
+
+            // Match card title to backend data
+            // Sabhi lists ab directly data object se aayengi
+            if(title === 'Orange cap') { list = d.top_batters; nameKey = 'batter'; statKey = 'runs'; }
+            else if(title === 'Most Fours') { list = d.most_fours; nameKey = 'batter'; statKey = 'fours'; }
+            else if(title === 'Most Sixes') { list = d.most_sixes; nameKey = 'batter'; statKey = 'sixes'; }
+            else if(title === 'Best Strike Rate') { list = d.best_strike_rate; nameKey = 'batter'; statKey = 'strike_rate'; }
+            else if(title === 'Highest Score') { list = d.highest_score; nameKey = 'batter'; statKey = 'runs_batter'; }
+            else if(title === 'Fastest Fifties') { list = d.fastest_fifty; nameKey = 'batter'; statKey = 'balls'; }
+            else if(title === 'Fastest Centuries') { list = d.fastest_century; nameKey = 'batter'; statKey = 'balls'; }
+            else if(title === 'Purple cap') { list = d.top_bowlers; nameKey = 'bowler'; statKey = 'wickets'; }
+            else if(title === 'Best Bowling Average') { list = d.best_bowling_average; nameKey = 'bowler'; statKey = 'average'; }
+            else if(title === 'Best Economy') { list = d.best_economy; nameKey = 'bowler'; statKey = 'economy'; }
+            else if(title === 'Best Bowling Figures') { list = d.best_bowling_figures; nameKey = 'bowler'; statKey = 'figs'; }
+            else if(title === 'Most Dots') { list = d.most_dots; nameKey = 'bowler'; statKey = 'dots'; }
+            
+            const tbody = document.getElementById('modalBody');
+            tbody.innerHTML = '';
+
+            if(Array.isArray(list) && list.length > 0) {
+                list.forEach((item, index) => {
+                    let rankColor = index === 0 ? 'text-yellow-400 font-black text-xl' : (index === 1 ? 'text-gray-300 font-bold text-lg' : (index === 2 ? 'text-orange-400 font-bold text-lg' : 'text-gray-500 font-semibold'));
+                    
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-800/40 transition-colors">
+                            <td class="px-6 py-4 ${rankColor}">#${index + 1}</td>
+                            <td class="px-6 py-4 font-bold text-white text-[15px]">${item[nameKey]}</td>
+                            <td class="px-6 py-4 font-black text-blue-400 text-right text-lg">${item[statKey]}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                 tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-10 text-center text-gray-500 font-medium">Top 10 list is only available for cumulative career stats.<br><br>Fastest/Highest records are single-event achievements.</td></tr>`;
+            }
+
+            document.getElementById('modalTitle').innerText = title;
+            const modal = document.getElementById('recordModal');
+            const modalContent = document.getElementById('recordModalContent');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+        }
+
+        // 3. Close Modal Function
+        function closeModal() {
+            const modal = document.getElementById('recordModal');
+            const modalContent = document.getElementById('recordModalContent');
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+        
+    </script>
+</body>
+</html>
